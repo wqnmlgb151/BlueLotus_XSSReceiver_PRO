@@ -44,13 +44,13 @@
 ###自动安装
 * 安装http server与PHP环境（Ubuntu: sudo apt-get install apache2 php8.2 libapache2-mod-php8.2）
 * 上传所有文件至空间根目录
-* 访问http://网站地址/
+* 访问`http://网站地址/`
  
 ![](./guide/install.png)
 
 * 根据提示配置xss平台
 * 在配置前，需要赋予xss数据存储路径、js模板存储路径、我的js存储路径写权限，以及平台根目录写权限（sudo chmod 777 -R ./）
-* 完成安装，访问http://网站地址/admin.php登录后台
+* 完成安装，访问`http://网站地址/admin.php登录后台`
 * 当有请求访问/index.php?a=xxx&b=xxxx，所有携带数据包括get，post，cookie，httpheaders，客户端信息都会记录
 * 如不做二次开发，可直接删除根目录下diff、guide、src目录
 * 如果有权限，请开启Apache中的AllowOverride以使.htaccess生效（可选）
@@ -62,7 +62,7 @@
 
 ###Windows phpStudy部署
 * 将项目放入phpStudy的WWW目录，确保PHP >= 8.0
-* 访问 http://localhost/install.php 完成安装
+* 访问 `http://localhost/install.php` 完成安装
 
 ###手动安装
 * 安装http server与PHP环境（Ubuntu: sudo apt-get install apache2 php8.2 libapache2-mod-php8.2）
@@ -240,8 +240,6 @@ http://你的站点/?token=自定义token&cookie=xxx
 * [x] 数据统计API
 * [x] 代码架构分层（Controller/Service/Storage）
 * [x] 部署方式 (phpStudy / Ubuntu / 自建Docker)
-* [ ] BS5前端UI全面重构
-* [ ] SQLite可选存储支持
 * [ ] Payload模板版本管理
 
 ## 原项目TODO
@@ -268,5 +266,3 @@ http://你的站点/?token=自定义token&cookie=xxx
 ## 意见与建议
 
 欢迎大家在使用过程中提出各种宝贵的意见和建议，以及各种bug，不胜感激
-
-反馈邮箱firesun.cn`at`gmail.com
