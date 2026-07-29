@@ -25,3 +25,8 @@ define('MAIL_USER', 'xxx@xxx.com'); //发件人用户名
 define('MAIL_PASS', 'xxxxxx'); //发件人密码
 define('MAIL_FROM', 'xxx@xxx.com'); //发件人地址（需真实，不可伪造）
 define('MAIL_RECV', 'xxxx@xxxx.com'); //接收通知的邮件地址
+
+/* 项目管理 (Pro新增) */
+define('PROJECTS', [
+    'default' => ['name' => '默认项目', 'token' => null],
+]);

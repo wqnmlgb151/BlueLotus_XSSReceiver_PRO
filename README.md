@@ -1,5 +1,38 @@
-# XSS数据接收平台（无SQL版）
-如从旧版本升级，请务必先阅读Readme。同时，只是一个很久以前打CTF比赛练手的项目，现在回看起来很多地方写的都不优雅，不过难得的发现过了这么多年还能使用。本项目仅供学习交流使用，不得用于任何非法用途。
+# BlueLotus XSSReceiver Pro
+
+> 本项目基于原 [BlueLotus_XSSReceiver](https://github.com/firesunCN/BlueLotus_XSSReceiver) (作者: firesun / 蓝莲花战队) 进行二次开发升级。
+> 原项目是一个优秀的CTF比赛练手项目，设计理念出色，时至今日仍能正常使用。
+> **BlueLotus_XSSReceiver_PRO 在保持原项目核心定位和轻量化设计的基础上进行了渐进式现代化改造。**
+>
+> 本项目仅供学习交流使用，**严禁用于任何非法用途**。
+
+## 定位
+
+- 学习 Web 安全
+- CTF 竞赛
+- 本地靶场
+- 授权 SRC 漏洞验证
+
+的数据接收和分析平台。
+
+## Pro版新增功能
+
+- **PHP 8.x 全面兼容** — 移除所有废弃语法，适配最新PHP版本
+- **安全加固** — CSRF Token防护、Session固定防护
+- **项目管理** — 支持多个独立测试项目，每个项目独立标识和Token
+- **日志搜索与导出** — 关键字搜索、JSON/CSV导出
+- **数据统计分析** — 今日/本周统计、IP TOP10排行
+- **现代化架构** — Controller/Service/Storage分层，代码更清晰可维护
+- **Docker部署支持** — 一键部署，开箱即用
+- **API增强** — 标准化的JSON API，支持搜索/导出/统计
+
+## 与原项目的兼容性
+
+- 保持原有URL路由结构（index.php / admin.php / api.php）
+- 保持原有config.php格式（新增PROJECTS配置项）
+- 保持原有数据文件格式（完全兼容旧数据）
+- 保持原有JS模板系统
+- 保持原有keepsession、邮件通知全部功能
 
 ## 平台说明
 * 本平台设计理念: 简单配置即可使用，无需数据库，无需其他组件支持，可直接在php虚拟空间使用
@@ -9,7 +42,7 @@
 
 ##安装说明
 ###自动安装
-* 安装http server与php环境（ubuntu: sudo apt-get install apache2 php5 或 sudo apt-get install apache2 php7.4 libapache2-mod-php7.4）
+* 安装http server与PHP环境（Ubuntu: sudo apt-get install apache2 php8.2 libapache2-mod-php8.2）
 * 上传所有文件至空间根目录
 * 访问http://网站地址/
  
@@ -24,8 +57,15 @@
 	* xss数据存储路径将被设置为禁止web访问
 	* js模板存储路径、我的js存储路径将被设置为仅允许访问js文件
 
+###Docker部署
+本项目不提供官方Docker镜像，有需要请自行编写Dockerfile构建。
+
+###Windows phpStudy部署
+* 将项目放入phpStudy的WWW目录，确保PHP >= 8.0
+* 访问 http://localhost/install.php 完成安装
+
 ###手动安装
-* 安装http server与php5环境（ubuntu: sudo apt-get install apache2 php5）
+* 安装http server与PHP环境（Ubuntu: sudo apt-get install apache2 php8.2 libapache2-mod-php8.2）
 * 上传所有文件至空间根目录
 * 将config-sample.php重命名为config.php，修改config.php，指定xss数据、我的js、js模板的存放目录，以及数据是否启用加密、加密密码、与加密方法（详细说明见文件注释）
 ```php
@@ -33,11 +73,11 @@ define('PASS', '2a05218c7aa0a6dbd370985d984627b8');
 define('DATA_PATH', 'data');
 define('JS_TEMPLATE_PATH', 'template');
 define('MY_JS_PATH', 'myjs');
-define('ENABLE_ENCRYPT', true);
+define('ENCRYPT_ENABLE', true);
 define('ENCRYPT_PASS', 'bluelotus');
 define('ENCRYPT_TYPE', 'RC4');
 ```
-* PASS为登录密码，可用`php -r '$salt="!KTMdg#^^I6Z!deIVR#SgpAI6qTN7oVl";$key="你的密码";$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);echo $key;'`生成密码hash
+* PASS为登录密码hash，可用以下命令生成: `php -r '$salt="!KTMdg#^^I6Z!deIVR#SgpAI6qTN7oVl";$key="你的密码";$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);echo $key;'`
 * 赋予`DATA_PATH`，`MY_JS_PATH`，`JS_TEMPLATE_PATH`对应的目录写权限
 * 当有请求访问/index.php?a=xxx&b=xxxx，所有携带数据包括get，post，cookie，httpheaders，客户端信息都会记录
 * 可访问admin.php登录查看记录的数据，初始登录密码bluelotus
@@ -116,6 +156,39 @@ define('MAIL_PASS', 'xxxxxx');//发件人密码
 define('MAIL_FROM', 'xxx@xxx.com');//发件人地址（需真实，不可伪造）
 define('MAIL_RECV', 'xxxx@xxxx.com');//接收通知的邮件地址
 ```
+## 项目管理 (Pro新增)
+
+在 `config.php` 中配置 `PROJECTS`:
+
+```php
+define('PROJECTS', [
+    'default' => ['name' => '默认项目', 'token' => null],
+    'src_a'   => ['name' => 'SRC测试-A厂商', 'token' => '自定义token'],
+]);
+```
+
+XSS Payload 中通过 `proj` 或 `token` 参数指定项目:
+
+```
+# 方式1: 项目标识
+http://你的站点/?proj=src_a&cookie=xxx
+
+# 方式2: 独立Token
+http://你的站点/?token=自定义token&cookie=xxx
+
+# 无参数默认走 default 项目(向后兼容)
+```
+
+## API接口 (Pro新增)
+
+| 端点 | 说明 |
+|------|------|
+| `api.php?cmd=search&keyword=X&project=Y` | 关键字搜索 |
+| `api.php?cmd=stats&project=Y` | 统计: 总计/今日/本周/TOP IP |
+| `api.php?cmd=export_json&project=Y` | 导出JSON文件 |
+| `api.php?cmd=export_csv&project=Y` | 导出CSV文件(BOM，Excel兼容) |
+| `api.php?project_cmd=list` | 获取项目列表 |
+
 ## 修改数据加密密码，加密方式
 
 * 本平台对xss记录、ip封禁列表、js的说明（仅说明）加密，用户可设置是否加密，密码以及加密方式（AES、RC4）
@@ -159,7 +232,19 @@ define('MAIL_RECV', 'xxxx@xxxx.com');//接收通知的邮件地址
 5. 复制原平台`DATA_PATH`，`MY_JS_PATH`，`JS_TEMPLATE_PATH`对应的目录，覆盖新平台的相应目录
 6. 升级完成
 
-## TODO
+## Pro版Roadmap
+* [x] PHP 8.x 全面兼容
+* [x] CSRF Token + Session固定防护
+* [x] 多项目管理（独立标识/Token/日志）
+* [x] 日志搜索、JSON/CSV导出
+* [x] 数据统计API
+* [x] 代码架构分层（Controller/Service/Storage）
+* [x] 部署方式 (phpStudy / Ubuntu / 自建Docker)
+* [ ] BS5前端UI全面重构
+* [ ] SQLite可选存储支持
+* [ ] Payload模板版本管理
+
+## 原项目TODO
 * 支持SAE
 * 多用户（SQL版本）
 * WebSocket方式通知

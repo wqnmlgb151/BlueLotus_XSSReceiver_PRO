@@ -56,6 +56,20 @@ if ($decoded_cookie_data)
 //判断是否keepsession（判断标准：get或者post或者cookie包含keepsession=1）
 $info['keepsession'] = isKeepSession($info) ? true : false;
 
+// 项目识别: 通过proj参数或token参数
+$project = 'default';
+if (isset($_GET['proj'])) {
+    $project = stripStr($_GET['proj']);
+} elseif (isset($_GET['token']) && defined('PROJECTS')) {
+    foreach (PROJECTS as $key => $cfg) {
+        if (isset($cfg['token']) && $cfg['token'] === $_GET['token']) {
+            $project = $key;
+            break;
+        }
+    }
+}
+$info['project'] = $project;
+
 save_xss_record(json_encode($info), $request_time);
 
 //发送邮件通知

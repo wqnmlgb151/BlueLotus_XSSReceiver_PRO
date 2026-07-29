@@ -25,9 +25,11 @@ $is_pass_wrong   = false;
 if (!isset($forbiddenIPList[$ip]) || $forbiddenIPList[$ip] <= 5) {
     if (isset($_POST['password']) && $_POST['password'] != "") {
         if (checkPassword($_POST['password'])) {
+            session_regenerate_id(true);
             $_SESSION['isLogin']    = true;
             $_SESSION['user_IP']    = $ip;
             $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             if (isset($forbiddenIPList[$ip])) {
                 unset($forbiddenIPList[$ip]);
                 saveForbiddenIPList($forbiddenIPList);

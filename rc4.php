@@ -35,10 +35,10 @@ function rc4($data_str, $key_str) {
     $key  = array();
     $data = array();
     for ($i = 0; $i < strlen($key_str); $i++) {
-        $key[] = ord($key_str{$i});
+        $key[] = ord($key_str[$i]);
     }
     for ($i = 0; $i < strlen($data_str); $i++) {
-        $data[] = ord($data_str{$i});
+        $data[] = ord($data_str[$i]);
     }
     // prepare key
     $state = array( 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,

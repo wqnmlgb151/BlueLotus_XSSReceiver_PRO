@@ -6,3 +6,4 @@ if (file_exists('config.php')) {
     header('Location: install.php');
     exit();
 }
+require_once('app/autoload.php');

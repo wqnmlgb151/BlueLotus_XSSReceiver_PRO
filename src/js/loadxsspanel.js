@@ -3,6 +3,28 @@ var urlbase = "./api.php"; //api.php基地址
 var messageList = null; //记录缓存，用于判断是否有新的记录
 var setIntervalID = null; //定时器ID，用于网络自适应，调节timeout
 var interval = 2000; //向服务器获取记录的时间间隔，同时也是ajax timeout时间
+var currentProject = 'default';
+var currentSearch  = '';
+// Pro: 动态构建API URL
+function getGridApiUrl() {
+    var url = urlbase + '?cmd=';
+    if (currentSearch) {
+        url += 'search&keyword=' + encodeURIComponent(currentSearch) + '&project=' + encodeURIComponent(currentProject);
+    } else {
+        url += 'list';
+    }
+    return url;
+}
+function refreshGridSource() {
+    var newUrl = getGridApiUrl();
+    var adapter = $('#panelGrid').jqxGrid('source');
+    if (adapter && adapter._source) {
+        adapter._source.url = newUrl;
+        $('#panelGrid').jqxGrid('updatebounddata');
+    }
+}
+function setProject(p) { currentProject = p; refreshGridSource(); }
+function setSearch(s) { currentSearch = s; refreshGridSource(); }
 
 $(document).ready(function() {
     var self = this;

@@ -168,7 +168,8 @@ CONFIG;
             $config_str .= 'define("MAIL_PASS", '.json_encode( $mail_pass).');//发件人密码' . PHP_EOL;
             $config_str .= 'define("MAIL_FROM", '.json_encode( $mail_from).');//发件人地址（需真实，不可伪造）' . PHP_EOL;
             $config_str .= 'define("MAIL_RECV", '.json_encode( $mail_recv).');//接收通知的邮件地址' . PHP_EOL;
-            
+            $config_str .= 'define("PROJECTS", ["default" => ["name" => "默认项目", "token" => null]]);' . PHP_EOL;
+
             if (file_put_contents("config.php", $config_str)===false)
             {
                 display_setup_form( '无法写入配置文件，请确保根目录有写权限' );
@@ -417,8 +418,6 @@ function display_setup_form( $error = null ) {
 
 //xss过滤
 function stripStr($str) {
-    if(get_magic_quotes_gpc())
-        $str=stripslashes($str);
     return htmlspecialchars($str,ENT_QUOTES,'UTF-8');
 }
 

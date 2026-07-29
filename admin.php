@@ -9,6 +9,7 @@ require_once('auth.php');
     <meta charset="utf-8" />
 
     <title>控制面板</title>
+    <script>var CSRF_TOKEN = <?php echo json_encode($_SESSION['csrf_token']); ?>;</script>
     <link rel="stylesheet" href="static/css/bootstrap.min.css" type="text/css" />
     <link rel="stylesheet" href="static/css/main.min.css" type="text/css" />
     <link rel="stylesheet" href="static/css/notification.min.css" type="text/css" />    
@@ -31,7 +32,7 @@ require_once('auth.php');
                         <span class="icon-bar"></span>
                     </button>
                 </div>
-                <h1 id="dash-logo" class="center-block">Blue-Lotus</h1>
+                <h1 id="dash-logo" class="center-block">BlueLotus Pro</h1>
                 <div class="collapse navbar-collapse" id="sidebar-nav" role="navigation">
                     <ul id="Tab" class="nav">
                         <li class="active">
@@ -58,7 +59,7 @@ require_once('auth.php');
 
 
                     </ul>
-                    <span id="rights">Copyright © 2015-2016<br>Powered by <a href="http://www.firesun.me" target="_blank">Firesun</a></span>
+                    <span id="rights">Copyright © 2015-2024<br>BlueLotus XSSReceiver Pro<br>Powered by <a href="http://www.firesun.me" target="_blank">Firesun</a></span>
                 </div>
             </div>
 
@@ -68,6 +69,21 @@ require_once('auth.php');
                     <div class="main-section-header row">
                         <h2 class="eam-efficiency col-xs-3">XSS接收面板</h2>
                         <div class="clear"></div>
+                    </div>
+                    <div id="panelToolbar" style="padding:8px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <select id="projectSelect" style="padding:4px 8px; border:1px solid #ccc; border-radius:3px;">
+                            <option value="default">默认项目</option>
+                        </select>
+                        <input id="panelSearchInput" type="text" placeholder="搜索关键字..." style="padding:4px 8px; border:1px solid #ccc; border-radius:3px; width:180px;" />
+                        <button id="panelSearchBtn" class="btn btn-xs btn-primary">搜索</button>
+                        <button id="panelSearchClear" class="btn btn-xs btn-default">清除</button>
+                        <span style="margin-left:8px; font-size:12px; color:#666;">
+                            总计:<b id="statTotal">0</b> 今日:<b id="statToday">0</b> 本周:<b id="statWeek">0</b>
+                        </span>
+                        <span style="margin-left:auto;">
+                            <button id="exportJsonBtn" class="btn btn-xs btn-info">导出JSON</button>
+                            <button id="exportCsvBtn" class="btn btn-xs btn-success">导出CSV</button>
+                        </span>
                     </div>
                     <div id="panelGrid"></div>
 
@@ -364,6 +380,7 @@ require_once('auth.php');
     </script>
 
     <script type="text/javascript" src="static/js/jquery.min.js"></script>
+    <script>$.ajaxSetup({headers: {'X-CSRF-Token': CSRF_TOKEN}});</script>
     <script type="text/javascript" src="static/js/jquery-ui.min.js"></script>
     <script type="text/javascript" src="static/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="static/js/beautify.min.js"></script>
@@ -378,7 +395,46 @@ require_once('auth.php');
     <script type="text/javascript" src="static/js/loadjstemplate.min.js"></script>
     <script type="text/javascript" src="static/js/loadmyjs.min.js"></script>
     <script type="text/javascript" src="static/js/notification.min.js"></script>
-    
+    <script>
+    $(function() {
+        var $projSel = $('#projectSelect'), $search = $('#panelSearchInput');
+
+        function getSearchUrl() {
+            var kw = $search.val().trim(), proj = $projSel.val() || 'default';
+            if (kw) return urlbase + '?cmd=search&keyword=' + encodeURIComponent(kw) + '&project=' + encodeURIComponent(proj);
+            return urlbase + '?cmd=list';
+        }
+        function refreshGrid() {
+            var adapter = $('#panelGrid').jqxGrid('source');
+            if (adapter && adapter._source) {
+                adapter._source.url = getSearchUrl();
+                $('#panelGrid').jqxGrid('updatebounddata');
+            }
+        }
+        function refreshStats() {
+            $.getJSON('api.php?cmd=stats&project=' + encodeURIComponent($projSel.val()), function(d) {
+                $('#statTotal').text(d.total); $('#statToday').text(d.today); $('#statWeek').text(d.week);
+            }).fail(function(){ $('#statTotal,#statToday,#statWeek').text('--'); });
+        }
+        function doExport(fmt) {
+            location.href = 'api.php?cmd=export_' + fmt + '&project=' + encodeURIComponent($projSel.val());
+        }
+
+        $.getJSON('api.php?project_cmd=list', function(data) {
+            $projSel.empty();
+            $.each(data, function(k, v) { $projSel.append('<option value="'+k+'">'+v.name+'</option>'); });
+        }).fail(function(){ $projSel.append('<option value="">加载失败</option>'); });
+
+        refreshStats();
+        $projSel.on('change', function(){ refreshGrid(); refreshStats(); });
+        $('#panelSearchBtn').on('click', refreshGrid);
+        $('#panelSearchClear').on('click', function(){ $search.val(''); refreshGrid(); });
+        $search.on('keydown', function(e) { if (e.which === 13) refreshGrid(); });
+        $('#exportJsonBtn').on('click', function(){ doExport('json'); });
+        $('#exportCsvBtn').on('click', function(){ doExport('csv'); });
+    });
+    </script>
+
 </body>
 
 </html>

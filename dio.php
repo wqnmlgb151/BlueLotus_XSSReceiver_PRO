@@ -69,7 +69,7 @@ function load_xss_record( $id ) {
 
 //删除某一时间戳的xss记录
 function delete_xss_record( $id ) {
-    if ( preg_match( ID_REGEX, $_GET['id'] ) ) {
+    if ( preg_match( ID_REGEX, $id ) ) {
         $xss_record_file = dirname(__FILE__) . '/' . DATA_PATH . '/' . $id . '.php';
         return unlink( $xss_record_file );
     }
