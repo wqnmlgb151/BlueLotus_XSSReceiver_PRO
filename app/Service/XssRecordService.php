@@ -77,6 +77,14 @@ class XssRecordService
     }
 
     /**
+     * 获取记录ID列表
+     */
+    public function listIds(): array
+    {
+        return $this->storage->listIds();
+    }
+
+    /**
      * 删除单条记录
      */
     public function deleteRecord(string $id): bool
@@ -160,21 +168,22 @@ class XssRecordService
         $records = $this->listRecords($filters);
 
         $fp = fopen('php://temp', 'r+');
-        fputcsv($fp, ['ID', '时间', 'IP', '位置', '请求方法', 'URL', 'User-Agent', 'Referer', 'GET参数', 'POST参数', 'Cookie']);
+        fputcsv($fp, ['ID', '时间', 'IP', '位置', '项目', '请求方法', 'URL', 'User-Agent', 'Referer', 'GET参数', 'POST参数', 'Cookie']);
 
         foreach ($records as $r) {
             fputcsv($fp, [
-                $r['request_time'] ?? '',
+                self::csvCell($r['request_time'] ?? ''),
                 date('Y-m-d H:i:s', (int) ($r['request_time'] ?? 0)),
-                $r['user_IP'] ?? '',
-                $r['location'] ?? '',
-                $r['request_method'] ?? '',
-                $r['request_URI'] ?? '',
-                $r['headers_data']['User-Agent'] ?? '',
-                $r['headers_data']['Referer'] ?? '',
-                json_encode($r['get_data'] ?? [], JSON_UNESCAPED_UNICODE),
-                json_encode($r['post_data'] ?? [], JSON_UNESCAPED_UNICODE),
-                json_encode($r['cookie_data'] ?? [], JSON_UNESCAPED_UNICODE),
+                self::csvCell($r['user_IP'] ?? ''),
+                self::csvCell($r['location'] ?? ''),
+                self::csvCell($r['project'] ?? 'default'),
+                self::csvCell($r['request_method'] ?? ''),
+                self::csvCell($r['request_URI'] ?? ''),
+                self::csvCell($r['headers_data']['User-Agent'] ?? ''),
+                self::csvCell($r['headers_data']['Referer'] ?? ''),
+                self::csvCell(json_encode($r['get_data'] ?? [], JSON_UNESCAPED_UNICODE)),
+                self::csvCell(json_encode($r['post_data'] ?? [], JSON_UNESCAPED_UNICODE)),
+                self::csvCell(json_encode($r['cookie_data'] ?? [], JSON_UNESCAPED_UNICODE)),
             ]);
         }
 
@@ -182,5 +191,15 @@ class XssRecordService
         $csv = stream_get_contents($fp);
         fclose($fp);
         return $csv;
+    }
+
+    /** 防止CSV公式注入：以 = + - @ 开头的单元格前加制表符 */
+    private static function csvCell($value): string
+    {
+        $str = (string) $value;
+        if ($str !== '' && strpbrk($str[0], '=+-@') !== false) {
+            return "\t" . $str;
+        }
+        return $str;
     }
 }

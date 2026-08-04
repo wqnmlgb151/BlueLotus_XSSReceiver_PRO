@@ -14,69 +14,68 @@ Requires PHP >= 8.0. No Composer, no PHPUnit tests, no CI/CD, no build step — 
 cp config-sample.php config.php
 
 # Generate password hash (see README "手动安装")
-php -r '$salt="!KTMdg#^^I6Z!deIVR#SgpAI6qTN7oVl";$key="你的密码";$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);echo $key;'
+php -r 'require "app/autoload.php"; echo \App\Helper\PasswordHasher::hash("你的密码");'
 
 chmod 777 -R data/ template/ myjs/
 ```
 
 ## Architecture
 
-### Entry Points (Root-level flat PHP files)
+### Entry Points
 
 | File | Role |
 |------|------|
-| `index.php` | XSS data capture — receives all GET/POST/Cookie/Headers from XSS payloads |
+| `index.php` | XSS data capture — collects GET/POST/Cookie/Headers, delegates to `XssRecordService` |
 | `admin.php` | Admin SPA dashboard (jQWidgets grid, JS editor, XSSOR tool) |
-| `api.php` | JSON API: record CRUD, search, stats, export, JS template/MyJS management |
+| `api.php` | Thin JSON API router — CSRF validation then delegates to controllers |
 | `login.php` | Challenge-response login with IP-based rate limiting (bans after 5 wrong attempts) |
-| `install.php` | Web-based setup wizard |
-| `keepsession.php` | Cron-triggered session keeper with `flock` single-instance locking |
+| `install.php` | Web-based setup wizard, uses PasswordHasher |
+| `keepsession.php` | Cron-triggered session keeper with SSRF URL whitelist + `flock` locking |
 | `change_encrypt_pass.php` | CLI tool for re-encrypting data (disabled by default — starts with `exit()`) |
 
 ### Infrastructure Files
 
 | File | Role |
 |------|------|
-| `config.php` | Copied from `config-sample.php`; defines all constants (PASS, paths, encryption, mail, projects) |
-| `load.php` | Bootstrap: loads `config.php` then `app/autoload.php`. Used by all entry points except `install.php` and `change_encrypt_pass.php` |
-| `auth.php` | Session enforcement — validates login state, IP/UA binding (gated by `ADMIN_IP_CHECK_ENABLE`), session expiry; required by `admin.php` and `api.php` |
-| `waf.php` | Security headers: CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection`; included by `login.php` and `auth.php` |
+| `config.php` | Copied from `config-sample.php`; all constants (PASS, paths, encryption, mail, projects) |
+| `load.php` | Bootstrap: loads `config.php` then `app/autoload.php` |
+| `dio.php` | JS file operations + ForbiddenIP list I/O (XSS record CRUD moved to `app/Storage/`) |
+| `auth.php` | Session enforcement: login state, IP/UA binding, forced logout on anomaly |
+| `waf.php` | Security headers: CSP, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection |
 
-### Layered Architecture under `app/`
+### Layered Architecture under `app/` (now fully wired)
 
 ```
 app/
-├── autoload.php          # PSR-4 autoloader (App\ namespace)
+├── autoload.php              # PSR-4 autoloader (App\ namespace)
 ├── Config/
-│   └── AppConfig.php     # Typed wrapper around config.php constants
+│   └── AppConfig.php         # Typed wrapper around config.php constants
+├── Controller/
+│   ├── XssRecordController.php   # /api.php?cmd= — record list/get/del/search/stats/export
+│   ├── JsTemplateController.php  # /api.php?js_template_cmd= — template CRUD
+│   ├── MyJsController.php        # /api.php?my_js_cmd= — my JS CRUD
+│   └── ProjectController.php     # /api.php?project_cmd= — project list
 ├── Helper/
-│   ├── Crypto.php        # AES-CTR / RC4 encrypt/decrypt (with base64 fallback)
-│   ├── IPLocator.php     # IP to geo-location via qqwry.dat (pure IP database)
-│   ├── Request.php       # getRealIP, getAllHeaders, collectXssInfo, base64 detection
-│   └── XssFilter.php     # htmlspecialchars-based XSS filtering (string + recursive array)
+│   ├── Crypto.php            # AES-CTR / RC4 encrypt/decrypt (with base64 fallback)
+│   ├── IPLocator.php         # IP to geo-location via qqwry.dat
+│   ├── PasswordHasher.php    # Centralized salt + hash() + verifyChallenge()
+│   ├── Request.php           # getRealIP, getAllHeaders, collectXssInfo, base64 detection
+│   ├── UrlValidator.php      # SSRF protection: URL scheme/host whitelist for keepsession
+│   └── XssFilter.php         # htmlspecialchars XSS filtering (string + recursive array)
 ├── Service/
-│   └── XssRecordService.php  # Business logic (CRUD, search, stats, export)
+│   └── XssRecordService.php  # Business logic: CRUD, search, stats, export — wired to controllers
 └── Storage/
     ├── StorageInterface.php  # Interface: save/load/delete/clearAll/listIds/listAll
-    └── FileStorage.php       # File-based implementation
+    └── FileStorage.php       # File-based implementation (id.php with <?php exit();?> prefix)
 ```
-
-**Important:** `app/Service/` and `app/Storage/` are unwired migration scaffolds — not instantiated by any runtime code. The live data path is `dio.php` (procedural functions called directly by `index.php` and `api.php`). `app/Helper/` classes are the only wired layer (via `functions.php` wrappers), and `AppConfig::projects()` is called at `api.php:285`.
-
-### Bridge Layer
-
-`functions.php` wraps `app\Helper\*` classes as procedural functions (`encrypt()`, `decrypt()`, `getRealIP()`, `stripStr()`, etc.) for backward compatibility with legacy code in `dio.php`, `index.php`, `login.php`.
-
-`dio.php` is the actual data I/O layer — all XSS record file operations, JS file operations, and forbidden IP list management. The newer `app/Storage/FileStorage.php` partially duplicates this logic but is not wired in.
 
 ### Data Flow
 
 1. Victim browser sends XSS payload data to `index.php?a=xxx&b=xxxx&proj=project_id`
-2. `index.php` collects GET/POST/Cookie/HTTP headers, detects base64 encoding, applies XSS filtering
-3. Project identified via `proj` or `token` GET parameter (falls back to `'default'`)
-4. Record saved — see Storage Format below
-5. Admin views/export data via `admin.php` AJAX calls to `api.php`
-6. `api.php` reads files, applies project/keyword filtering, returns JSON
+2. `index.php` collects data (XssFilter, Request helpers), identifies project, calls `XssRecordService::saveRecord()`
+3. Record saved via `FileStorage` as `data/{unix_timestamp}.php`
+4. Admin views/export data via `admin.php` AJAX → `api.php` → Controller → Service → Storage
+5. JS template/MyJS operations still go through dio.php procedural functions (called by controllers)
 
 ### Storage Format
 
@@ -88,31 +87,28 @@ app/
 
 ### Authentication
 
-- Challenge-response via `auth.php`: server generates random `firesunCheck` → client runs triple MD5 hash (salt + PASS + challenge + salt) in JS → server verifies from `PASS` constant
-- Session bound to User-Agent (always) and IP (gated by `ADMIN_IP_CHECK_ENABLE`); violations force logout
-- CSRF token via `X-CSRF-Token` header on all jQuery AJAX requests, with `$_SERVER['HTTP_REFERER']` fallback
-- IP banned after 5 wrong password attempts (counter > 5 triggers ban); correct password resets the counter. Delete `data/forbiddenIPList.dat` to unban
+- Challenge-response: server generates random `firesunCheck` → client hashes with salt + PASS via triple MD5 → server verifies via `PasswordHasher::verifyChallenge()` using `hash_equals`
+- Salt in `PasswordHasher::SALT` shared with `static/js/login.min.js` (must stay in sync)
+- Session bound to User-Agent (always) and IP (gated by `ADMIN_IP_CHECK_ENABLE`)
+- CSRF: `X-CSRF-Token` header on all jQuery AJAX, with `HTTP_REFERER` fallback in api.php
+- IP banned after 5 wrong password attempts; correct password resets counter
 
-### Project System (PRO feature)
+### Project System
 
-Multi-project support configured in `config.php` `PROJECTS` array:
-```php
-define('PROJECTS', [
-    'default' => ['name' => '默认项目', 'token' => null],
-    'src_a'   => ['name' => 'SRC测试-A厂商', 'token' => 'customtoken123'],
-]);
-```
+Multi-project support in `config.php` `PROJECTS` array. Payloads specify via `?proj=src_a` or `?token=customtoken123`.
 
 ## Key Technical Notes
 
-- `define('IN_XSS_PLATFORM', true)` must be set before including any other file — guards all includes against direct access.
-- Data encryption uses AES-CTR or RC4 (configurable). RC4 is the default for performance. `base64_encode` is used as fallback when encryption is disabled.
-- The bundled `qqwry.dat` (10MB) is the pure IP geo-location database used by `IPLocator.php`.
-- Frontend uses jQWidgets (CC BY-NC 3.0 license — non-commercial use only) with custom modifications (diffs in `diff/` directory).
-- JS editor is Ace editor with js_beautify and jsmin for formatting/minification.
-- `src/`, `diff/`, `guide/` are source/reference material only — safe to delete in production.
-- `.htaccess` restricts web access to `data/` (deny all) and limits `template/`/`myjs/` to `.js` files only.
+- `define('IN_XSS_PLATFORM', true)` guards all includes against direct access.
+- Encryption: AES-CTR or RC4 (default). `base64_encode` fallback when disabled.
+- `qqwry.dat` (10MB) is the pure IP geo-location database.
+- Frontend: jQWidgets (CC BY-NC 3.0 — non-commercial only) with custom modifications in `diff/`.
+- JS editor: Ace editor + js_beautify + jsmin.
+- `src/`, `diff/`, `guide/` are source/reference — safe to delete in production.
+- `.htaccess` restricts `data/` (deny all) and limits `template/`/`myjs/` to `.js` files only.
+- `KEEP_SESSION_ALLOWED_HOSTS`: optional allowlist for keepsession redirect targets (URL whitelist via `UrlValidator`).
+- `change_encrypt_pass.php` starts with `exit()` — must uncomment before use.
 
 ## Version Numbering
 
-x.y.z: x = major architecture change, y = feature addition, z = bug fix.
+x.y.z: x = major architecture change, y = feature addition, z = bug fix. Changelog maintained in README.md.

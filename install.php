@@ -1,5 +1,6 @@
 <?php
 define('IN_XSS_PLATFORM',true);
+require_once('app/autoload.php');
 ignore_user_abort(true);
 
 //检测是否已经安装
@@ -135,10 +136,7 @@ switch($step) {
         else
         {
             //生成密码hash
-            $salt='!KTMdg#^^I6Z!deIVR#SgpAI6qTN7oVl';
-            $pass=md5($salt.$pass.$salt);
-            $pass=md5($salt.$pass.$salt);
-            $pass=md5($salt.$pass.$salt);
+            $pass = \App\Helper\PasswordHasher::hash($pass);
                 
             $config_str = <<<CONFIG
 <?php

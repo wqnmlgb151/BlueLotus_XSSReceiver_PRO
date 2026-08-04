@@ -1,7 +1,7 @@
 <?php
 define('IN_XSS_PLATFORM', true);
 
-require_once('functions.php');
+require_once('load.php');
 require_once('dio.php');
 
 //CSP开启
@@ -20,7 +20,7 @@ if (isset($_SESSION['isLogin']) && $_SESSION['isLogin'] === true) {
 
 //判断ip是否在封禁列表中
 $forbiddenIPList = loadForbiddenIPList();
-$ip              = getRealIP();
+$ip              = \App\Helper\Request::getRealIP();
 $is_pass_wrong   = false;
 if (!isset($forbiddenIPList[$ip]) || $forbiddenIPList[$ip] <= 5) {
     if (isset($_POST['password']) && $_POST['password'] != "") {
@@ -48,32 +48,18 @@ if (!isset($forbiddenIPList[$ip]) || $forbiddenIPList[$ip] <= 5) {
 } else
     $is_pass_wrong = true;
 
-/*
-生成密码
-
-php -r '$salt="!KTMdg#^^I6Z!deIVR#SgpAI6qTN7oVl";$key="你的密码";$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);$key=md5($salt.$key.$salt);echo $key;'
-
-*/
+// 生成密码: php -r 'require "app/autoload.php"; echo \App\Helper\PasswordHasher::hash("你的密码");'
+// salt 常量见 App\Helper\PasswordHasher::SALT，与 static/js/login.min.js 中保持同步
 function checkPassword($p) {
     if (isset($_POST['firesunCheck']) && isset($_SESSION['firesunCheck']) && $_SESSION['firesunCheck'] != '' && $_POST['firesunCheck'] === $_SESSION['firesunCheck']) {
-        //改了这个盐记得改login.js里的，两个要一致
-        $salt = '!KTMdg#^^I6Z!deIVR#SgpAI6qTN7oVl';
-        $key  = PASS;
-        $key  = md5($salt . $key . $_SESSION['firesunCheck'] . $salt);
-        $key  = md5($salt . $key . $_SESSION['firesunCheck'] . $salt);
-        $key  = md5($salt . $key . $_SESSION['firesunCheck'] . $salt);
-        return $key === $p;
+        return \App\Helper\PasswordHasher::verifyChallenge(PASS, $_SESSION['firesunCheck'], $p);
     }
     return false;
 }
 
 //生成挑战应答的随机值
 function generate_password($length = 32) {
-    $chars    = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    $password = '';
-    for ($i = 0; $i < $length; $i++)
-        $password .= $chars[mt_rand(0, strlen($chars) - 1)];
-    return $password;
+    return substr(bin2hex(random_bytes(($length + 1) / 2)), 0, $length);
 }
 ?>
 <!DOCTYPE html>

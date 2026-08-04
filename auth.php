@@ -3,7 +3,7 @@ if (!defined('IN_XSS_PLATFORM')) {
     exit('Access Denied');
 }
 
-require_once('functions.php');
+require_once('load.php');
 
 //设置httponly
 ini_set('session.cookie_httponly', 1);
@@ -20,7 +20,7 @@ if ( !(isset($_SESSION['isLogin']) && $_SESSION['isLogin'] === true && isset($_S
     exit();
 }
 
-if ( ADMIN_IP_CHECK_ENABLE && !(isset($_SESSION['user_IP']) && $_SESSION['user_IP'] != '' && $_SESSION['user_IP'] === getRealIP()) ) {
+if ( ADMIN_IP_CHECK_ENABLE && !(isset($_SESSION['user_IP']) && $_SESSION['user_IP'] != '' && $_SESSION['user_IP'] === \App\Helper\Request::getRealIP()) ) {
     $_SESSION['isLogin']    = false;
     $_SESSION['user_IP']    = '';
     $_SESSION['user_agent'] = '';

@@ -9,10 +9,19 @@ class FileStorage implements StorageInterface
     private $dataPath;
     private $ipDataPath;
 
+    private static function resolvePath(string $path): string
+    {
+        // 绝对路径直接返回，相对路径基于项目根目录解析
+        if (strpos($path, '/') === 0 || (PHP_OS_FAMILY === 'Windows' && preg_match('/^[A-Za-z]:[\\\\\\/]/', $path))) {
+            return $path;
+        }
+        return __DIR__ . '/../..' . '/' . $path;
+    }
+
     public function __construct(string $dataPath, string $ipDataPath)
     {
-        $this->dataPath   = rtrim($dataPath, '/');
-        $this->ipDataPath = $ipDataPath;
+        $this->dataPath   = rtrim(self::resolvePath($dataPath), '/');
+        $this->ipDataPath = self::resolvePath($ipDataPath);
     }
 
     /**
@@ -124,35 +133,4 @@ class FileStorage implements StorageInterface
         return $list;
     }
 
-    /**
-     * 加载封禁IP列表
-     */
-    public function loadForbiddenIPList(): array
-    {
-        $file = $this->dataPath . '/forbiddenIPList.dat';
-        if (!file_exists($file)) {
-            @touch($file);
-        }
-        $str = @file_get_contents($file);
-        if ($str === false || $str === '') {
-            return [];
-        }
-        $str = Crypto::decrypt($str);
-        if ($str === '') {
-            return [];
-        }
-        $result = json_decode($str, true);
-        return ($result !== null) ? $result : [];
-    }
-
-    /**
-     * 保存封禁IP列表
-     */
-    public function saveForbiddenIPList(array $list): void
-    {
-        $file = $this->dataPath . '/forbiddenIPList.dat';
-        $str = json_encode($list);
-        $str = Crypto::encrypt($str);
-        @file_put_contents($file, $str);
-    }
 }

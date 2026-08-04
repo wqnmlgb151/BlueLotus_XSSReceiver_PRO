@@ -1,4 +1,4 @@
-# BlueLotus XSSReceiver Pro
+# BlueLotus XSSReceiver Pro v4.1.0
 
 > 本项目基于原 [BlueLotus_XSSReceiver](https://github.com/firesunCN/BlueLotus_XSSReceiver) (作者: firesun / 蓝莲花战队) 进行二次开发升级。
 > 原项目是一个优秀的CTF比赛练手项目，设计理念出色，时至今日仍能正常使用。
@@ -22,9 +22,12 @@
 - **项目管理** — 支持多个独立测试项目，每个项目独立标识和Token
 - **日志搜索与导出** — 关键字搜索、JSON/CSV导出
 - **数据统计分析** — 今日/本周统计、IP TOP10排行
-- **现代化架构** — Controller/Service/Storage分层，代码更清晰可维护
+- **现代化架构** — Controller/Service/Storage分层已完整接线，api.php精简为路由层
 - **Docker部署支持** — 一键部署，开箱即用
 - **API增强** — 标准化的JSON API，支持搜索/导出/统计
+- **SSRF防护** — keepsession.php URL白名单校验，协议限制，curl重定向协议约束
+- **密码安全** — 哈希逻辑集中至 App\Helper\PasswordHasher，login校验改用 hash_equals
+- **代码去重** — dio.php XSS记录函数与FileStorage重复逻辑已消除，functions.php胶水层已移除
 
 ## 与原项目的兼容性
 
@@ -232,14 +235,41 @@ http://你的站点/?token=自定义token&cookie=xxx
 5. 复制原平台`DATA_PATH`，`MY_JS_PATH`，`JS_TEMPLATE_PATH`对应的目录，覆盖新平台的相应目录
 6. 升级完成
 
+## 更新日志
+
+版本号规则: `x.y.z` — x 重大架构变更 / y 功能新增 / z Bug修复。
+
+### v4.1.0 (2026-08)
+- **架构接线**: `app/Service` + `app/Storage` 全链路接入运行时，`dio.php` XSS记录函数去重（266→147行）
+- **上帝文件拆分**: `api.php` 从 290 行 switch-case 重构为 36 行路由层，拆出 4 个 Controller
+- **胶水层移除**: `functions.php` 删除，所有调用方直接引 `App\Helper\*` 静态方法
+- **SSRF 防护**: `keepsession.php` 新增 URL 白名单 + curl 协议限制 + 重定向逐跳校验 + CRLF 注入防护
+- **密码安全**: 哈希逻辑集中至 `PasswordHasher`，登录校验改用 `hash_equals`，随机数改用 `random_bytes`
+- **CSV 导出安全**: 公式注入防护（`=+-@` 前缀自动加 `\t`）
+- **`.gitignore` 加固**: 新增 `config.php` / `data/` 防误提交
+- 新增 `KEEP_SESSION_ALLOWED_HOSTS` 配置项
+
+### v4.0.0
+- PHP 8.x 全面兼容，移除废弃语法
+- CSRF Token 防护 + Session 固定防护 + 安全头 (`waf.php`)
+- 多项目管理（独立标识/Token/日志）
+- 日志搜索、JSON/CSV 导出、数据统计 API
+- 代码架构分层 (Controller/Service/Storage)
+- Docker / phpStudy / Ubuntu 部署支持
+
 ## Pro版Roadmap
 * [x] PHP 8.x 全面兼容
 * [x] CSRF Token + Session固定防护
 * [x] 多项目管理（独立标识/Token/日志）
 * [x] 日志搜索、JSON/CSV导出
 * [x] 数据统计API
-* [x] 代码架构分层（Controller/Service/Storage）
+* [x] 代码架构分层（Controller/Service/Storage）— 已完整接线
 * [x] 部署方式 (phpStudy / Ubuntu / 自建Docker)
+* [x] SSRF防护（keepsession URL白名单 + curl协议限制）
+* [x] 密码哈希逻辑集中 + hash_equals 校验
+* [x] api.php 上帝文件拆分（290行 → 31行路由层）
+* [x] dio.php 去重（XSS记录函数迁移至FileStorage）
+* [x] functions.php 胶水层移除
 * [ ] Payload模板版本管理
 
 ## 原项目TODO
