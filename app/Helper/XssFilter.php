@@ -3,22 +3,30 @@ namespace App\Helper;
 
 class XssFilter
 {
+    public const MAX_DEPTH = 32;
     /**
      * XSS过滤: 对单个字符串进行HTML实体编码
      */
     public static function stripStr(string $str): string
     {
-        return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars($str, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**
      * XSS过滤: 递归处理数组的键和值
      */
-    public static function stripArr(array $arr): array
+    public static function stripArr(array $arr, int $depth = 0): array
     {
+        if ($depth > self::MAX_DEPTH) {
+            throw new \InvalidArgumentException('Parameter nesting limit exceeded');
+        }
         $newArr = [];
         foreach ($arr as $k => $v) {
-            $newArr[self::stripStr($k)] = self::stripStr($v);
+            if (!is_array($v) && !is_scalar($v) && $v !== null) {
+                throw new \InvalidArgumentException('Unsupported parameter type');
+            }
+            $newArr[self::stripStr((string) $k)] = is_array($v)
+                ? self::stripArr($v, $depth + 1) : self::stripStr((string) $v);
         }
         return $newArr;
     }

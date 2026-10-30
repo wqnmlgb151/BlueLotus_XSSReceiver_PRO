@@ -10,7 +10,7 @@ final class XssRecordController
         $project = $_GET['project'] ?? null;
 
         switch ($cmd) {
-            // list / id_list 返回全部记录（不按项目过滤，保持旧版行为）
+            // list 可显式按项目过滤；不传项目及 id_list 保持全局行为。
             case 'list':
                 return $service->listRecords($project !== null ? ['project' => $project] : []);
 

@@ -29,6 +29,10 @@ class Crypto
     {
         if (ENCRYPT_ENABLE) {
             if (ENCRYPT_TYPE === 'AES') {
+                $raw = base64_decode($info, true);
+                if ($raw === false || strlen($raw) < 8) {
+                    return '';
+                }
                 require_once dirname(__DIR__, 2) . '/aes.php';
                 $info = AESDecryptCtr($info, ENCRYPT_PASS);
             } else {

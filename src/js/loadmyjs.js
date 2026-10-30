@@ -38,6 +38,7 @@ $(document).ready(function() {
     };
 
     var myJS_dataAdapter = new $.jqx.dataAdapter(myJS_source, {
+        beforeSend: function(xhr) { xhr.setRequestHeader('X-CSRF-Token', CSRF_TOKEN); },
         loadComplete: function() {
             if (myJS_last_select_name !== "") {
                 $("#myJS_listbox").jqxListBox('selectItem', myJS_last_select_name);

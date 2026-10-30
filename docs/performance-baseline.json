@@ -1,0 +1,46 @@
+{
+    "php": "8.2.29",
+    "os": "Windows",
+    "encryption": "RC4",
+    "sample": "single warm run per operation, synthetic records; not p95",
+    "datasets": [
+        {
+            "records": 1000,
+            "list": {
+                "milliseconds": 525.27,
+                "peak_mib": 4
+            },
+            "search": {
+                "milliseconds": 336.09,
+                "peak_mib": 4
+            },
+            "stats": {
+                "milliseconds": 315.92,
+                "peak_mib": 4
+            },
+            "export": {
+                "milliseconds": 364.72,
+                "peak_mib": 4
+            }
+        },
+        {
+            "records": 10000,
+            "list": {
+                "milliseconds": 5617.65,
+                "peak_mib": 16
+            },
+            "search": {
+                "milliseconds": 4097.86,
+                "peak_mib": 16
+            },
+            "stats": {
+                "milliseconds": 3635.2,
+                "peak_mib": 16
+            },
+            "export": {
+                "milliseconds": 3471.76,
+                "peak_mib": 22
+            }
+        }
+    ]
+}

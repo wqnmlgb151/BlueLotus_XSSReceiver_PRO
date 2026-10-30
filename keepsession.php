@@ -12,6 +12,11 @@ require_once('load.php');
 require_once('dio.php');
 
 if (KEEP_SESSION) {
+    if (!function_exists('curl_init')) {
+        error_log('XSSReceiver: cURL extension unavailable');
+        http_response_code(503);
+        exit();
+    }
     //利用非阻塞的flock实现单例运行
     $pid = fopen(DATA_PATH . '/check.pid', "w");
     if (!$pid)
@@ -34,7 +39,8 @@ if (KEEP_SESSION) {
                 $ip = $info['user_IP'];
                 $allowedHosts = defined('KEEP_SESSION_ALLOWED_HOSTS') ? KEEP_SESSION_ALLOWED_HOSTS : [];
                 $serverHost   = $_SERVER['HTTP_HOST'] ?? '';
-                if ($url !== '' && $cookie !== '' && \App\Helper\UrlValidator::isAllowed($url, $serverHost, $allowedHosts)) {
+                $serverScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                if ($url !== '' && $cookie !== '' && \App\Helper\UrlValidator::isAllowed($url, $serverHost, $allowedHosts, $serverScheme)) {
                     // 逐跳手动跟随重定向，每跳重新校验host白名单（防止重定向SSRF绕过）
                     $maxHops = 3;
                     $currentUrl = $url;
@@ -61,16 +67,11 @@ if (KEEP_SESSION) {
 
                         // 3xx重定向：提取Location并校验
                         if ($httpCode >= 300 && $httpCode < 400) {
-                            preg_match('/^Location:\s*(.+)$/im', $response, $match);
+                            $responseHeaders = substr($response, 0, curl_getinfo($ch, CURLINFO_HEADER_SIZE));
+                            preg_match('/^Location:[ \t]*([^\r\n]+)/im', $responseHeaders, $match);
                             if (empty($match[1])) break;
-                            $nextUrl = trim($match[1]);
-                            // 相对路径补全
-                            if (strpos($nextUrl, 'http') !== 0) {
-                                $parts = parse_url($currentUrl);
-                                $base = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
-                                $nextUrl = $base . ($nextUrl[0] === '/' ? '' : '/') . $nextUrl;
-                            }
-                            if (!\App\Helper\UrlValidator::isAllowed($nextUrl, $serverHost, $allowedHosts)) break;
+                            $nextUrl = \App\Helper\UrlValidator::resolve($currentUrl, trim($match[1]));
+                            if ($nextUrl === null || !\App\Helper\UrlValidator::isAllowed($nextUrl, $serverHost, $allowedHosts, $serverScheme)) break;
                             $currentUrl = $nextUrl;
                         } else {
                             break; // 非重定向，停止
@@ -108,7 +109,7 @@ function getCookie($info)
     else if (isset($info['cookie_data']['cookie']) && $info['cookie_data']['cookie'] != "")
         $cookie = $info['cookie_data']['cookie'];
 
-    return htmlspecialchars_decode($cookie, ENT_QUOTES);
+    return is_string($cookie) ? htmlspecialchars_decode($cookie, ENT_QUOTES) : '';
 
 }
 
@@ -131,5 +132,5 @@ function getLocation($info)
     else if (isset($info['headers_data']['Referer']) && $info['headers_data']['Referer'] != "")
         $location = $info['headers_data']['Referer'];
 
-    return htmlspecialchars_decode($location, ENT_QUOTES);
+    return is_string($location) ? htmlspecialchars_decode($location, ENT_QUOTES) : '';
 }

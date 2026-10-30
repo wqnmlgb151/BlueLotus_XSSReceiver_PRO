@@ -11,7 +11,7 @@ function getGridApiUrl() {
     if (currentSearch) {
         url += 'search&keyword=' + encodeURIComponent(currentSearch) + '&project=' + encodeURIComponent(currentProject);
     } else {
-        url += 'list';
+        url += 'list&project=' + encodeURIComponent(currentProject);
     }
     return url;
 }
@@ -25,6 +25,14 @@ function refreshGridSource() {
 }
 function setProject(p) { currentProject = p; refreshGridSource(); }
 function setSearch(s) { currentSearch = s; refreshGridSource(); }
+
+// 嵌套参数以 JSON 展示；叶子已由接收端进行 HTML 转义。
+function formatParameterValue(value) {
+    if (value && typeof value === 'object') {
+        return JSON.stringify(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    return value == null ? '' : value;
+}
 
 $(document).ready(function() {
     var self = this;
@@ -62,7 +70,10 @@ $(document).ready(function() {
                     dataType: "json",
                     timeout: interval,
                     success: function(data) {
-                        if (data == true) $("#panelGrid").jqxGrid('deleterow', id);
+                        if (data == true) {
+                            $("#panelGrid").jqxGrid('deleterow', id);
+                            $(document).trigger('recordsChanged');
+                        }
                         else {
                             $('#failedWindow').jqxWindow('open');
                         }
@@ -106,7 +117,10 @@ $(document).ready(function() {
                     dataType: "json",
                     timeout: interval,
                     success: function(data) {
-                        if (data == true) $('#panelGrid').jqxGrid('clear');
+                        if (data == true) {
+                            $('#panelGrid').jqxGrid('clear');
+                            $(document).trigger('recordsChanged');
+                        }
                         else {
                             $('#failedWindow').jqxWindow('open');
                         }
@@ -278,6 +292,8 @@ $(document).ready(function() {
         }, {
             name: 'request_time'
         }, {
+            name: 'id', type: 'string'
+        }, {
             name: 'headers_data'
         }, {
             name: 'get_data'
@@ -300,13 +316,14 @@ $(document).ready(function() {
         }, {
             name: 'client'
         } ],
-        id: 'request_time',
-        url: urlbase + "?cmd=list",
+        id: 'id',
+        url: getGridApiUrl(),
         root: 'data'
     };
 
     //从接口获得数据后的处理，格式化时间与根据useragent判断客户端
     var grid_dataAdapter = new $.jqx.dataAdapter(grid_source, {
+        beforeSend: function(xhr) { xhr.setRequestHeader('X-CSRF-Token', CSRF_TOKEN); },
         downloadComplete: function(data, status, xhr) {
             if (status == "success") {
                 var i = data.length;
@@ -355,10 +372,10 @@ $(document).ready(function() {
             for (var key in datarecord.get_data) {
                 var get_data_item = [];
                 get_data_item.push(key);
-                get_data_item.push(datarecord.get_data[key]);
+                get_data_item.push(formatParameterValue(datarecord.get_data[key]));
                 var decoded_value = "";
                 if (datarecord.decoded_get_data) decoded_value = datarecord.decoded_get_data[key];
-                get_data_item.push(decoded_value);
+                get_data_item.push(formatParameterValue(decoded_value));
                 get_data.push(get_data_item);
             }
 
@@ -421,12 +438,12 @@ $(document).ready(function() {
             for (key in datarecord.post_data) {
                 var post_data_item = [];
                 post_data_item.push(key);
-                post_data_item.push(datarecord.post_data[key]);
+                post_data_item.push(formatParameterValue(datarecord.post_data[key]));
 
                 var decoded_value = "";
                 if (datarecord.decoded_post_data)
                     decoded_value = datarecord.decoded_post_data[key];
-                post_data_item.push(decoded_value);
+                post_data_item.push(formatParameterValue(decoded_value));
 
                 post_data.push(post_data_item);
             }
@@ -492,12 +509,12 @@ $(document).ready(function() {
             for (key in datarecord.cookie_data) {
                 var cookie_data_item = [];
                 cookie_data_item.push(key);
-                cookie_data_item.push(datarecord.cookie_data[key]);
+                cookie_data_item.push(formatParameterValue(datarecord.cookie_data[key]));
 
                 var decoded_value = "";
                 if (datarecord.decoded_cookie_data) decoded_value = datarecord.decoded_cookie_data[key];
 
-                cookie_data_item.push(decoded_value);
+                cookie_data_item.push(formatParameterValue(decoded_value));
                 cookie_data.push(cookie_data_item);
             }
             var cookie_source = {

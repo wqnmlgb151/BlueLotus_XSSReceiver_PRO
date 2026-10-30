@@ -20,6 +20,15 @@ class XssRecordService
     {
         $info['project'] = $project;
         $id = $info['request_time'] ?? (string) time();
+        if (defined('UNIQUE_RECORD_ID_ENABLE') && UNIQUE_RECORD_ID_ENABLE) {
+            if (!preg_match('/\A[0-9]{10}\z/', (string) $id)) {
+                error_log('XSSReceiver: invalid request timestamp');
+                return false;
+            }
+            $id .= '-' . bin2hex(random_bytes(16));
+            $info['id'] = $id;
+            return $this->storage->create($info, $id);
+        }
         return $this->storage->save($info, $id);
     }
 
@@ -42,7 +51,11 @@ class XssRecordService
                 return false;
             }
             if (isset($filters['keyword'])) {
-                $json = json_encode($record);
+                $json = json_encode($record, JSON_UNESCAPED_UNICODE);
+                if ($json === false) {
+                    error_log('XSSReceiver: search encoding failed');
+                    return false;
+                }
                 if (stripos($json, $filters['keyword']) === false) {
                     return false;
                 }
@@ -172,7 +185,7 @@ class XssRecordService
 
         foreach ($records as $r) {
             fputcsv($fp, [
-                self::csvCell($r['request_time'] ?? ''),
+                self::csvCell($r['id'] ?? $r['request_time'] ?? ''),
                 date('Y-m-d H:i:s', (int) ($r['request_time'] ?? 0)),
                 self::csvCell($r['user_IP'] ?? ''),
                 self::csvCell($r['location'] ?? ''),

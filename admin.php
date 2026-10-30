@@ -78,11 +78,11 @@ require_once('auth.php');
                         <button id="panelSearchBtn" class="btn btn-xs btn-primary">搜索</button>
                         <button id="panelSearchClear" class="btn btn-xs btn-default">清除</button>
                         <span style="margin-left:8px; font-size:12px; color:#666;">
-                            总计:<b id="statTotal">0</b> 今日:<b id="statToday">0</b> 本周:<b id="statWeek">0</b>
+                            总计:<b id="statTotal">0</b> 今日:<b id="statToday">0</b> 最近7天:<b id="statWeek">0</b>
                         </span>
                         <span style="margin-left:auto;">
-                            <button id="exportJsonBtn" class="btn btn-xs btn-info">导出JSON</button>
-                            <button id="exportCsvBtn" class="btn btn-xs btn-success">导出CSV</button>
+                            <button id="exportJsonBtn" class="btn btn-xs btn-info" title="导出当前项目全部记录，不受关键词影响">导出JSON</button>
+                            <button id="exportCsvBtn" class="btn btn-xs btn-success" title="导出当前项目全部记录，不受关键词影响">导出CSV</button>
                         </span>
                     </div>
                     <div id="panelGrid"></div>
@@ -332,7 +332,7 @@ require_once('auth.php');
             </div>
             <div>
                 <div class="windows-tip-div">
-                    您确认清空所有记录吗？
+                    您确认清空所有项目的全部记录吗？
                 </div>
                 <div>
                     <div class="windows-button-div">
@@ -399,17 +399,10 @@ require_once('auth.php');
     $(function() {
         var $projSel = $('#projectSelect'), $search = $('#panelSearchInput');
 
-        function getSearchUrl() {
-            var kw = $search.val().trim(), proj = $projSel.val() || 'default';
-            if (kw) return urlbase + '?cmd=search&keyword=' + encodeURIComponent(kw) + '&project=' + encodeURIComponent(proj);
-            return urlbase + '?cmd=list';
-        }
         function refreshGrid() {
-            var adapter = $('#panelGrid').jqxGrid('source');
-            if (adapter && adapter._source) {
-                adapter._source.url = getSearchUrl();
-                $('#panelGrid').jqxGrid('updatebounddata');
-            }
+            currentProject = $projSel.val() || 'default';
+            currentSearch = $search.val().trim();
+            refreshGridSource();
         }
         function refreshStats() {
             $.getJSON('api.php?cmd=stats&project=' + encodeURIComponent($projSel.val()), function(d) {
@@ -417,15 +410,28 @@ require_once('auth.php');
             }).fail(function(){ $('#statTotal,#statToday,#statWeek').text('--'); });
         }
         function doExport(fmt) {
-            location.href = 'api.php?cmd=export_' + fmt + '&project=' + encodeURIComponent($projSel.val());
+            fetch('api.php?cmd=export_' + fmt + '&project=' + encodeURIComponent($projSel.val()), {
+                credentials: 'same-origin', headers: {'X-CSRF-Token': CSRF_TOKEN}
+            }).then(function(response) {
+                if (!response.ok || response.redirected) throw new Error('Export failed');
+                return response.blob();
+            }).then(function(blob) {
+                var url = URL.createObjectURL(blob), link = document.createElement('a');
+                link.href = url; link.download = 'xss_export.' + (fmt === 'json' ? 'json' : 'csv');
+                document.body.appendChild(link); link.click(); link.remove();
+                setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+            }).catch(function(){ $('#failedWindow').jqxWindow('open'); });
         }
 
         $.getJSON('api.php?project_cmd=list', function(data) {
             $projSel.empty();
-            $.each(data, function(k, v) { $projSel.append('<option value="'+k+'">'+v.name+'</option>'); });
+            $.each(data, function(k, v) { $projSel.append($('<option>').val(k).text(v.name)); });
+            refreshGrid();
+            refreshStats();
         }).fail(function(){ $projSel.append('<option value="">加载失败</option>'); });
 
         refreshStats();
+        $(document).on('recordsChanged', refreshStats);
         $projSel.on('change', function(){ refreshGrid(); refreshStats(); });
         $('#panelSearchBtn').on('click', refreshGrid);
         $('#panelSearchClear').on('click', function(){ $search.val(''); refreshGrid(); });

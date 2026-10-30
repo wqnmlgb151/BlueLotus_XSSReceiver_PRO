@@ -1,4 +1,4 @@
-# BlueLotus XSSReceiver Pro v4.1.0
+# BlueLotus XSSReceiver Pro v4.2.0
 
 > 本项目基于原 [BlueLotus_XSSReceiver](https://github.com/firesunCN/BlueLotus_XSSReceiver) (作者: firesun / 蓝莲花战队) 进行二次开发升级。
 > 原项目是一个优秀的CTF比赛练手项目，设计理念出色，时至今日仍能正常使用。
@@ -21,9 +21,9 @@
 - **安全加固** — CSRF Token防护、Session固定防护
 - **项目管理** — 支持多个独立测试项目，每个项目独立标识和Token
 - **日志搜索与导出** — 关键字搜索、JSON/CSV导出
-- **数据统计分析** — 今日/本周统计、IP TOP10排行
+- **数据统计分析** — 今日/最近7天统计、IP TOP10排行
 - **现代化架构** — Controller/Service/Storage分层已完整接线，api.php精简为路由层
-- **Docker部署支持** — 一键部署，开箱即用
+- **Docker部署说明** — 当前需自行编写 Dockerfile 构建，无官方镜像或一键部署配置
 - **API增强** — 标准化的JSON API，支持搜索/导出/统计
 - **SSRF防护** — keepsession.php URL白名单校验，协议限制，curl重定向协议约束
 - **密码安全** — 哈希逻辑集中至 App\Helper\PasswordHasher，login校验改用 hash_equals
@@ -43,7 +43,7 @@
 
 ![](./guide/mainpanel.png)
 
-##安装说明
+## 安装说明
 ###自动安装
 * 安装http server与PHP环境（Ubuntu: sudo apt-get install apache2 php8.2 libapache2-mod-php8.2）
 * 上传所有文件至空间根目录
@@ -52,7 +52,7 @@
 ![](./guide/install.png)
 
 * 根据提示配置xss平台
-* 在配置前，需要赋予xss数据存储路径、js模板存储路径、我的js存储路径写权限，以及平台根目录写权限（sudo chmod 777 -R ./）
+* 安装时为 PHP 运行账户授予数据、模板、我的 JS 目录及生成配置所需的最小写权限；安装后收回项目根目录的写权限，不要递归赋予所有用户写权限。
 * 完成安装，访问`http://网站地址/admin.php登录后台`
 * 当有请求访问/index.php?a=xxx&b=xxxx，所有携带数据包括get，post，cookie，httpheaders，客户端信息都会记录
 * 如不做二次开发，可直接删除根目录下diff、guide、src目录
@@ -108,7 +108,7 @@ define('ENCRYPT_TYPE', 'RC4');
 
 ![](./guide/search.png)
 
-* 除了style允许unsafe-inline外启用CSP
+* 启用CSP；当前script与style均允许unsafe-inline
 * 挑战应答式的登录校验，session绑定ip与useragent
 * 密码输错五次封IP，误封请删除`DATA_PATH`/forbiddenIPList.dat文件
 * 可以通过平台直接维护用于xss的js文件（详细说明见下）
@@ -170,7 +170,7 @@ define('PROJECTS', [
 ]);
 ```
 
-XSS Payload 中通过 `proj` 或 `token` 参数指定项目:
+XSS Payload 中通过 `proj` 或 `token` 参数指定项目。Token 仅用于分类，不是接收鉴权；未知 Token 归入默认项目，不提供项目级权限隔离。
 
 ```
 # 方式1: 项目标识
@@ -187,10 +187,46 @@ http://你的站点/?token=自定义token&cookie=xxx
 | 端点 | 说明 |
 |------|------|
 | `api.php?cmd=search&keyword=X&project=Y` | 关键字搜索 |
-| `api.php?cmd=stats&project=Y` | 统计: 总计/今日/本周/TOP IP |
+| `api.php?cmd=stats&project=Y` | 统计: 总计/今日/最近7天/TOP IP |
 | `api.php?cmd=export_json&project=Y` | 导出JSON文件 |
 | `api.php?cmd=export_csv&project=Y` | 导出CSV文件(BOM，Excel兼容) |
 | `api.php?project_cmd=list` | 获取项目列表 |
+
+管理界面的列表、搜索与统计按选中项目处理；导出包含该项目全部记录，不受关键词影响。新消息通知仍覆盖所有项目，清空操作会删除所有项目记录。旧 API 不传项目的 `cmd=list` 仍返回全部项目。
+
+嵌套请求参数以原结构保存并在详情中按 JSON 展示。最多允许根数组下 32 层嵌套；超过限制返回 HTTP 400。非法 UTF-8 以替代字符保存。搜索匹配已存储的 HTML 实体文本及 Base64 解码字段，中文直接匹配，不会对历史数据反向解码或改写。
+
+### 本地验证与前端产物
+
+使用 PHP 8.x CLI 和 Node.js，无需安装测试框架：
+
+```text
+php tests/regression.php
+php tests/receiver.php
+php tests/record-ids.php off
+php tests/record-ids.php RC4
+php tests/concurrent-records.php
+node scripts/build-panel.js
+node tests/panel.js
+```
+
+PHP 测试只在新建的系统临时目录写入合成数据，不读取真实配置。前端脚本使用仓库自带 JSMin 重新生成 `static/js/loadxsspanel.min.js`，管理页实际加载该文件。当前验证不包含真实浏览器布局或生产部署。
+
+实施进度、验证与恢复限制见 [优化计划](docs/optimization-plan.md) 和 [恢复步骤](docs/recovery-runbook.md)。
+
+### 唯一记录 ID（分阶段启用）
+
+新旧记录均可读取，API 返回字符串 `id`，`request_time` 继续表示原请求时间。新格式为 `十位秒时间-32位随机十六进制值`，外部调用方应以完整 `id` 查询/删除，CSV 的 ID 列也使用该值。
+
+`UNIQUE_RECORD_ID_ENABLE` 默认关闭，保留旧格式写入。先部署兼容读取版本并备份、演练恢复，再在实际 `config.php` 中设置 `define('UNIQUE_RECORD_ID_ENABLE', true);` 启用唯一 ID，避免同秒覆盖。关闭开关仍可读新记录，但旧格式写入的覆盖风险会恢复。新建使用同目录硬链接排他发布，文件系统必须支持；不支持时返回保存失败。
+
+当前本地未加密、RC4 及 AES 均已通过混合记录回归；AES 的作用域及 PHP 8.2 转换警告已修复，并验证旧密文样本兼容。恢复时须使用双格式兼容版本，不能直接退回仅识别十位 ID 的版本。
+
+所有 API 请求包括导出均需登录会话和 `X-CSRF-Token` 请求头，单独 Referer 不再被接受。管理页已为 jQuery、jQWidgets 独立 AJAX 和下载请求设置 Token；自定义调用方需同步升级。无效 Token 返回 HTTP 403。
+
+保活仅默认允许与平台相同协议、主机、端口的目标。白名单可指定 `host:port`；不带端口的主机仅允许相应 HTTP/HTTPS 默认端口。每次重定向重新校验，跨主机使用显式白名单，DNS 解析与网络隔离仍需部署方控制。cURL 缺失时保活返回 503，不再因扩展未加载而显示内部错误。
+
+完整离线回归可运行 `pwsh -File tests/run.ps1 -Php <PHP8可执行路径>`。真实 HTTP 与浏览器验证使用 `tests/prepare-web.ps1` 生成的隔离副本，配置和测试凭据均为合成值；`tests/web.mjs` 只接受回环目标。性能原始数据见 [本地基线](docs/performance-baseline.json)，依赖清单见 [维护边界](docs/maintenance-boundaries.md)。
 
 ## 修改数据加密密码，加密方式
 
@@ -238,6 +274,17 @@ http://你的站点/?token=自定义token&cookie=xxx
 ## 更新日志
 
 版本号规则: `x.y.z` — x 重大架构变更 / y 功能新增 / z Bug修复。
+
+### v4.2.0 (2026-10-30)
+
+- 新增可选唯一记录 ID，读取兼容旧记录；排他创建、原子替换与新旧 ID 的管理、通知及导出接线。
+- 修复嵌套参数、中文搜索、项目筛选、读取回写、失败提示和 AES/PHP 8.2 兼容问题。
+- API 统一要求会话 CSRF Token；导出及 jQWidgets 独立 AJAX 配套升级，移除 Referer 回退。
+- 保活按协议、主机和端口逐跳校验，修复相对重定向；缺少 cURL 返回 503。
+- 增加离线回归、HTTP/浏览器验证、可复现 JS 构建、性能基线和恢复文档。
+- 发布自检补齐 API 参数和损坏记录字段类型校验；发布包不包含本地配置、采集数据、测试夹具或浏览器证据。
+
+升级注意：唯一 ID 默认关闭，启用前完成备份与双格式读取部署；API 调用方必须发送 `X-CSRF-Token`。详见 [文档索引](docs/README.md) 与 [v4.2.0 发布说明](docs/releases/v4.2.0.md)。
 
 ### v4.1.0 (2026-08)
 - **架构接线**: `app/Service` + `app/Storage` 全链路接入运行时，`dio.php` XSS记录函数去重（266→147行）

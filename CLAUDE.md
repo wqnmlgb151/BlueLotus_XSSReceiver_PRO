@@ -8,7 +8,7 @@ BlueLotus_XSSReceiver_PRO is a file-based XSS data receiving and analysis platfo
 
 ## Setup
 
-Requires PHP >= 8.0. No Composer, no PHPUnit tests, no CI/CD, no build step — PHPMailer and JS libraries are bundled raw; development happens directly on source files.
+Requires PHP >= 8.0. No Composer or PHPUnit dependency. CLI regressions live in tests/ (tests/run.ps1); scripts/build-panel.js rebuilds the three maintained JS assets using bundled JSMin. PHPMailer and JS libraries remain bundled. See docs/optimization-plan.md for completed local validation and deployment limits.
 
 ```bash
 cp config-sample.php config.php
@@ -79,7 +79,7 @@ app/
 
 ### Storage Format
 
-- XSS records: `data/{unix_timestamp}.php` — `<?php exit();?>ENCRYPTED_JSON`
+- XSS records: `data/{unix_timestamp}.php` or `data/{unix_timestamp}-{32_hex_chars}.php` — `<?php exit();?>ENCRYPTED_JSON`. `UNIQUE_RECORD_ID_ENABLE` opts into new IDs; API `id` is a string, independent of `request_time`. Readers support both formats.
 - JS descriptions: `{template|myjs}/{name}.desc` — encrypted text
 - JS content: `{template|myjs}/{name}.js` — plain JS
 - Forbidden IP list: `data/forbiddenIPList.dat` — encrypted JSON
@@ -90,7 +90,7 @@ app/
 - Challenge-response: server generates random `firesunCheck` → client hashes with salt + PASS via triple MD5 → server verifies via `PasswordHasher::verifyChallenge()` using `hash_equals`
 - Salt in `PasswordHasher::SALT` shared with `static/js/login.min.js` (must stay in sync)
 - Session bound to User-Agent (always) and IP (gated by `ADMIN_IP_CHECK_ENABLE`)
-- CSRF: `X-CSRF-Token` header on all jQuery AJAX, with `HTTP_REFERER` fallback in api.php
+- CSRF: `X-CSRF-Token` required on jQuery, jQWidgets AJAX and fetch exports. No Referer fallback; missing/invalid token returns 403.
 - IP banned after 5 wrong password attempts; correct password resets counter
 
 ### Project System
@@ -106,7 +106,7 @@ Multi-project support in `config.php` `PROJECTS` array. Payloads specify via `?p
 - JS editor: Ace editor + js_beautify + jsmin.
 - `src/`, `diff/`, `guide/` are source/reference — safe to delete in production.
 - `.htaccess` restricts `data/` (deny all) and limits `template/`/`myjs/` to `.js` files only.
-- `KEEP_SESSION_ALLOWED_HOSTS`: optional allowlist for keepsession redirect targets (URL whitelist via `UrlValidator`).
+- `KEEP_SESSION_ALLOWED_HOSTS`: allowlist for keepsession redirect targets, supporting host:port. Bare hosts allow default ports only; same-origin checks scheme, host and port. Relative redirects preserve base directory and port. cURL is required (missing extension returns 503).
 - `change_encrypt_pass.php` starts with `exit()` — must uncomment before use.
 
 ## Version Numbering

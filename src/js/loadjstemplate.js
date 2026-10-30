@@ -42,6 +42,7 @@ $(document).ready(function() {
     };
 
     jsTemplate_dataAdapter = new $.jqx.dataAdapter(jsTemplate_source, {
+        beforeSend: function(xhr) { xhr.setRequestHeader('X-CSRF-Token', CSRF_TOKEN); },
         loadComplete: function() {
             if (jsTemplate_last_select_name !== "") {
                 $("#jsTemplate_listbox").jqxListBox('selectItem', jsTemplate_last_select_name);

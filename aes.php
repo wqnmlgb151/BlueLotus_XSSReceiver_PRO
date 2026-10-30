@@ -160,6 +160,8 @@ function RotWord($w) {// rotate 4-byte word w left by one byte
     return $w;
 }
 
+// May be included from Crypto methods; AES functions explicitly read these globals.
+global $Sbox, $Rcon;
 // Sbox is pre-computed multiplicative inverse in GF(2^8) used in SubBytes and KeyExpansion [§5.1.1]
 $Sbox = array(0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
               0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
@@ -345,6 +347,7 @@ function AESDecryptCtr($ciphertext, $password = "blue-lotus", $nBits = 128) {
  * @return   a right-shifted and zero-filled by b bits
  */
 function urs($a, $b) {
+    $a = (int) $a;
     $a &= 0xffffffff;
     $b &= 0x1f; // (bounds check)
     if ($a & 0x80000000 && $b > 0) { // if left-most bit set

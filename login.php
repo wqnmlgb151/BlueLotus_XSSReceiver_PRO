@@ -51,6 +51,7 @@ if (!isset($forbiddenIPList[$ip]) || $forbiddenIPList[$ip] <= 5) {
 // 生成密码: php -r 'require "app/autoload.php"; echo \App\Helper\PasswordHasher::hash("你的密码");'
 // salt 常量见 App\Helper\PasswordHasher::SALT，与 static/js/login.min.js 中保持同步
 function checkPassword($p) {
+    if (!is_string($p)) { return false; }
     if (isset($_POST['firesunCheck']) && isset($_SESSION['firesunCheck']) && $_SESSION['firesunCheck'] != '' && $_POST['firesunCheck'] === $_SESSION['firesunCheck']) {
         return \App\Helper\PasswordHasher::verifyChallenge(PASS, $_SESSION['firesunCheck'], $p);
     }
@@ -59,7 +60,7 @@ function checkPassword($p) {
 
 //生成挑战应答的随机值
 function generate_password($length = 32) {
-    return substr(bin2hex(random_bytes(($length + 1) / 2)), 0, $length);
+    return substr(bin2hex(random_bytes((int) ceil($length / 2))), 0, $length);
 }
 ?>
 <!DOCTYPE html>

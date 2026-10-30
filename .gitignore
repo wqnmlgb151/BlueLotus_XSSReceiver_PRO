@@ -2,3 +2,7 @@
 /config.php
 /data/*
 !/data/.htaccess
+
+# Local browser evidence and release output
+/.playwright-mcp/
+/dist/

@@ -23,6 +23,7 @@ exit();
  */
 define('IN_XSS_PLATFORM', true);
 require_once('config.php');
+require_once('app/autoload.php');
 
 if( isset( $argv[1] ) ) {
 	if ($argv[1] === 'update')
@@ -65,7 +66,7 @@ function modify_xss_record($old_encrypt_enable, $old_encrypt_pass, $old_encrypt_
     
     foreach ($files as $file) {
         $filename = basename($file, ".php");
-        if (preg_match('/^[0-9]{10}$/', $filename)) {
+        if (\App\Storage\RecordId::isValid($filename)) {
             $logFile = dirname(__FILE__) . '/' . DATA_PATH . '/' . $filename . '.php';
             $info    = @file_get_contents($logFile);
             

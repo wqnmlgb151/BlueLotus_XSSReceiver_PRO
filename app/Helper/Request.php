@@ -102,8 +102,11 @@ class Request
     /**
      * 尝试对数组值进行base64解码
      */
-    public static function tryBase64Decode(array $arr)
+    public static function tryBase64Decode(array $arr, int $depth = 0)
     {
+        if ($depth > XssFilter::MAX_DEPTH) {
+            throw new \InvalidArgumentException('Parameter nesting limit exceeded');
+        }
         if (count($arr) === 0) {
             return false;
         }
@@ -111,7 +114,11 @@ class Request
         $newArr = [];
         foreach ($arr as $k => $v) {
             $decoded = '';
-            if (self::isBase64Formatted($v)) {
+            if (is_array($v)) {
+                $nested = self::tryBase64Decode($v, $depth + 1);
+                $decoded = $nested === false ? [] : $nested;
+                $isChanged = $isChanged || $nested !== false;
+            } elseif (is_string($v) && self::isBase64Formatted($v)) {
                 $decoded = base64_decode($v);
                 $isChanged = true;
             }
